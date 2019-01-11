@@ -16,10 +16,16 @@ class RPi():
         self.currY = val
     def raisePen(self):
         print "Raising Pen"
+        # Hardware Movement of raisePen here
+
+        #Computer value resetting of raisePen here
         self.isPenLowered = False
         return 0
     def lowerPen(self):
         print "Lowering Pen"
+        # Hardware Movement of lowerPen Here
+
+        # Computer value resetting of lowerPen here
         self.isPenLowered = True
         return 0
     def penRight(self, steps):

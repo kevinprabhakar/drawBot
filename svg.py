@@ -163,9 +163,9 @@ class SVG:
         if not self.pi.penLowered():
             self.pi.lowerPen()
         if x >= self.pi.getCurrX():
-            self.pi.penRight(self.pi.getCurrX() - x)
+            self.pi.penRight(x - self.pi.getCurrX())
         else:
-            self.pi.penLeft(x - self.pi.getCurrX())
+            self.pi.penLeft(self.pi.getCurrX() - x)
         return 0
 
     def relativeHorizontal(self,x):
@@ -180,10 +180,13 @@ class SVG:
     def absoluteVertical(self,y):
         if not self.pi.penLowered():
             self.pi.lowerPen()
+
         if y >= self.pi.getCurrY():
             self.pi.penDown(y-self.pi.getCurrY())
         else:
             self.pi.penUp(self.pi.getCurrY() - y)
+
+
 
     def relativeVertical(self,y):
         if not self.pi.penLowered():
@@ -191,17 +194,9 @@ class SVG:
         if y >= 0:
             self.pi.penDown(y)
         else:
-            self.pi.penUp(y)
+            self.pi.penUp(y * -1)
         return 0
 
-    def absoluteCubic(self,x1,y1,x2,y2,x,y):
-        return 0
-    def relativeCubic(self,dx1,dy1,dx2,dy2,dx,dy):
-        return 0
-    def absoluteSCubic(self,x1,y1,x,y):
-        return 0
-    def relativeSCubic(self,x1,y1,x,y):
-        return 0
     def absoluteQuadratic(self,x1,y1,x,y):
         return 0
     def relativeQuadratic(self,x1,y1,x,y):
@@ -210,10 +205,19 @@ class SVG:
         return 0
     def relativeTQuadratic(self,x,y):
         return 0
+    def absoluteCubic(self,x1,y1,x2,y2,x,y):
+        return 0
+    def relativeCubic(self,dx1,dy1,dx2,dy2,dx,dy):
+        return 0
+    def absoluteSCubic(self,x1,y1,x,y):
+        return 0
+    def relativeSCubic(self,x1,y1,x,y):
+        return 0
     def absoluteArc(self,rx,ry,xAxisRotation,largeArcFlag,sweepFlag,x,y):
         return 0
     def relativeArc(self,rx,ry,xAxisRotation,largeArcFlag,sweepFlag,x,y):
         return 0
+
     def printCurrLocation(self):
         print "Current Location: (%d, %d)" % (self.pi.getCurrX(), self.pi.getCurrY())
 
@@ -221,7 +225,9 @@ class SVG:
 
 
     def parsePath(self):
-        while self.peek() != 'z' and self.peek() != 'Z':
+        startX, startY = 0,0
+
+        while True:
             if self.peek() == 'M':
                 origX = self.pi.getCurrX()
                 origY = self.pi.getCurrY()
@@ -229,6 +235,9 @@ class SVG:
                 y = int(self.nextAndGet())
                 print "Moving from (%d, %d) to (%d, %d)" % (origX, origY, x, y)
                 self.absoluteMoveTo(x,y)
+                startX = self.pi.getCurrX()
+                startY = self.pi.getCurrY()
+
                 self.printCurrLocation()
                 self.nextInstr()
 
@@ -254,25 +263,75 @@ class SVG:
                 self.relativeLineTo(x,y)
                 self.printCurrLocation()
                 self.nextInstr()
+            elif self.peek() == 'H':
+                origX = self.pi.getCurrX()
+                origY = self.pi.getCurrY()
+                x = int(self.nextAndGet())
+                print "Drawing horizontal line from (%d, %d) to (%d, %d)" % (origX, origY, x, origY)
+
+                self.absoluteHorizonTal(x)
+
+                self.printCurrLocation()
+                self.nextInstr()
+            elif self.peek() == 'h':
+                origX = self.pi.getCurrX()
+                origY = self.pi.getCurrY()
+                x = int(self.nextAndGet())
+                print "Drawing relative horizontal line from (%d, %d) width length %d" % (origX, origY, x)
+
+                self.relativeHorizontal(x)
+
+                self.printCurrLocation()
+                self.nextInstr()
+
+            elif self.peek() == 'V':
+                origX = self.pi.getCurrX()
+                origY = self.pi.getCurrY()
+                y = int(self.nextAndGet())
+                print "Drawing vertical line from (%d, %d) to (%d, %d)" % (origX, origY, origX, y)
+
+                self.absoluteVertical(y)
+
+                self.printCurrLocation()
+                self.nextInstr()
+            elif self.peek() == 'v':
+                origX = self.pi.getCurrX()
+                origY = self.pi.getCurrY()
+                y = int(self.nextAndGet())
+                print "Drawing relative vertical line from (%d, %d) height length %d" % (origX, origY, y)
+
+                self.relativeVertical(y)
+
+                self.printCurrLocation()
+                self.nextInstr()
+
+            elif self.peek() == 'z' or self.peek() == 'Z':
+                print "Returning to start point (%d, %d)" % (startX, startY)
+                self.absoluteLineTo(startX, startY)
+                self.pi.points.append((self.pi.getCurrX(), self.pi.getCurrY()))
+                self.printCurrLocation()
+                self.nextInstr()
             else:
                 print self.peek()
-                return
-        return self.pi.getPoints()
+                return self.pi.getPoints()
 
 
 
 
 if __name__=="__main__":
-    htmlCode = '''<svg width="4cm" height="4cm" viewBox="0 0 400 400"xmlns="http://www.w3.org/2000/svg" version="1.1"> <title>Example triangle01- simple example of a 'path'</title> <desc>A path that draws a triangle</desc> <rect x="1" y="1" width="398" height="398"fill="none" stroke="blue" /> <path d="M 100 100 L 300 100 L 200 300 z"fill="red" stroke="blue" stroke-width="3" /> </svg>'''
+    htmlCode = '''<svg width="4cm" height="4cm" viewBox="0 0 400 400"xmlns="http://www.w3.org/2000/svg" version="1.1"> <title>Example triangle01- simple example of a 'path'</title> <desc>A path that draws a triangle</desc> <rect x="1" y="1" width="398" height="398"fill="none" stroke="blue" /> <path d="M 324 887 H 723 V 957 H 324 z M 293 684 H 754 V 842 H 293 z M 242 551 H 805 V 639 H 242 z M 387 313 H 660 V 507 H 387 z M 219 217 H 828 V 269 H 219 z M 336 62 H 711 V 172 H 336 z
+
+"fill="red" stroke="blue" stroke-width="3" /> </svg>'''
     svgAnalysis = SVG(htmlCode)
     svgAnalysis.getSVGPath()
     xyPoints = svgAnalysis.parsePath()
+    print xyPoints
     xVals = []
     yVals = []
     for point in xyPoints:
         xVals.append(point[0])
         yVals.append(point[1])
-    plt.plot(xVals,yVals)
+    plt.plot(xVals, yVals)
     plt.ylabel('some numbers')
     plt.show()
 
