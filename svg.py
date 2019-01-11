@@ -21,6 +21,8 @@ def is_number(s):
 
     return False
 
+util = Util()
+
 class SVG:
     def __init__(self, HTMLCode):
         self.htmlCode = HTMLCode
@@ -197,7 +199,18 @@ class SVG:
             self.pi.penUp(y * -1)
         return 0
 
+    #tinyurl.com/yclswhxl
     def absoluteQuadratic(self,x1,y1,x,y):
+        #x1, y1 = control point for start and end
+        #x, y = end point for curve
+        currX = self.pi.getCurrX()
+        currY = self.pi.getCurrY()
+        points = [(currX, currY),(x1,y1),(x,y)]
+        curvePoints = util.generalQuadratic(points)
+        for index in range(1,len(curvePoints)):
+            self.absoluteLineTo(curvePoints[index][0],curvePoints[index][1])
+
+
         return 0
     def relativeQuadratic(self,x1,y1,x,y):
         return 0
@@ -206,7 +219,17 @@ class SVG:
     def relativeTQuadratic(self,x,y):
         return 0
     def absoluteCubic(self,x1,y1,x2,y2,x,y):
+        # x1, y1 = control point for start
+        # x2, y2 = control point for end
+        # x, y = end point for curve
+        currX = self.pi.getCurrX()
+        currY = self.pi.getCurrY()
+        points = [(currX, currY), (x1, y1), (x2,y2), (x, y)]
+        curvePoints = util.generalQuadratic(points)
+        for index in range(1, len(curvePoints)):
+            self.absoluteLineTo(curvePoints[index][0], curvePoints[index][1])
         return 0
+
     def relativeCubic(self,dx1,dy1,dx2,dy2,dx,dy):
         return 0
     def absoluteSCubic(self,x1,y1,x,y):
@@ -227,7 +250,8 @@ class SVG:
     def parsePath(self):
         startX, startY = 0,0
 
-        while True:
+        while self.currInstr < len(self.path):
+            print self.currInstr
             if self.peek() == 'M':
                 origX = self.pi.getCurrX()
                 origY = self.pi.getCurrY()
@@ -305,6 +329,39 @@ class SVG:
                 self.printCurrLocation()
                 self.nextInstr()
 
+            elif self.peek() == 'Q':
+                origX = self.pi.getCurrX()
+                origY = self.pi.getCurrY()
+                ctrlx = int(self.nextAndGet())
+                ctrly = int(self.nextAndGet())
+                endX = int(self.nextAndGet())
+                endY = int(self.nextAndGet())
+
+                print "Drawing Quadratic Curve from (%d, %d) to (%d, %d) with control point (%d, %d)" % (origX, origY, endX, endY, ctrlx, ctrly)
+
+                self.absoluteQuadratic(ctrlx,ctrly,endX,endY)
+
+                self.printCurrLocation()
+                self.nextInstr()
+
+            elif self.peek() == 'C':
+                origX = self.pi.getCurrX()
+                origY = self.pi.getCurrY()
+                ctrlx1 = int(self.nextAndGet())
+                ctrly1 = int(self.nextAndGet())
+                ctrlx2 = int(self.nextAndGet())
+                ctrly2 = int(self.nextAndGet())
+                endX = int(self.nextAndGet())
+                endY = int(self.nextAndGet())
+
+                print "Drawing Cubic Curve from (%d, %d) to (%d, %d) with control points (%d, %d) and (%d, %d)" % (origX, origY, endX, endY, ctrlx1, ctrly1, ctrlx2, ctrly2)
+
+                self.absoluteCubic(ctrlx1, ctrly1, ctrlx2, ctrly2, endX, endY)
+
+                self.printCurrLocation()
+                self.nextInstr()
+
+
             elif self.peek() == 'z' or self.peek() == 'Z':
                 print "Returning to start point (%d, %d)" % (startX, startY)
                 self.absoluteLineTo(startX, startY)
@@ -314,14 +371,11 @@ class SVG:
             else:
                 print self.peek()
                 return self.pi.getPoints()
-
-
+        return self.pi.getPoints()
 
 
 if __name__=="__main__":
-    htmlCode = '''<svg width="4cm" height="4cm" viewBox="0 0 400 400"xmlns="http://www.w3.org/2000/svg" version="1.1"> <title>Example triangle01- simple example of a 'path'</title> <desc>A path that draws a triangle</desc> <rect x="1" y="1" width="398" height="398"fill="none" stroke="blue" /> <path d="M 324 887 H 723 V 957 H 324 z M 293 684 H 754 V 842 H 293 z M 242 551 H 805 V 639 H 242 z M 387 313 H 660 V 507 H 387 z M 219 217 H 828 V 269 H 219 z M 336 62 H 711 V 172 H 336 z
-
-"fill="red" stroke="blue" stroke-width="3" /> </svg>'''
+    htmlCode = '''<svg width="4cm" height="4cm" viewBox="0 0 400 400"xmlns="http://www.w3.org/2000/svg" version="1.1"> <title>Example triangle01- simple example of a 'path'</title> <desc>A path that draws a triangle</desc> <rect x="1" y="1" width="398" height="398"fill="none" stroke="blue" /> <path d="M 100 200 C 100 100 400 100 400 200 z"fill="red" stroke="blue" stroke-width="3" /> </svg>'''
     svgAnalysis = SVG(htmlCode)
     svgAnalysis.getSVGPath()
     xyPoints = svgAnalysis.parsePath()
@@ -334,8 +388,3 @@ if __name__=="__main__":
     plt.plot(xVals, yVals)
     plt.ylabel('some numbers')
     plt.show()
-
-
-
-
-
