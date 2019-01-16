@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 from util import Util
 from hardware import RPi
 import matplotlib.pyplot as plt
+from pathPrepper import PathPrepper
 
 
 
@@ -24,28 +25,18 @@ def is_number(s):
 util = Util()
 
 class SVG:
-    def __init__(self, HTMLCode):
-        self.htmlCode = HTMLCode
+    def __init__(self, fileName):
+        self.fileName = fileName
         self.currInstr = 0
         self.path = []
         self.width = 0
         self.height = 0
         self.pi = RPi()
+        self.prepper = PathPrepper(fileName)
 
     def getSVGPath(self):
-        parsedHTML = BeautifulSoup(self.htmlCode, "xml")
-
-        #Gather meta-info about svg element
-        svgElem = parsedHTML.find('svg')
-        self.width = svgElem["width"]
-        self.height = svgElem["height"]
-
-        #Gather meta-info about svg path
-        pathElem = parsedHTML.find('path')
-        pathText = pathElem["d"]
-        self.path = pathText.split(" ")
-
-        print self.path
+        self.prepper.getSVGPaths()
+        self.path = self.prepper.getSinglePath()
 
     def peek(self):
         return self.path[self.currInstr]
@@ -106,10 +97,10 @@ class SVG:
                     error = error + deltaErr
                     while error >= 0.5:
                         if slope >= 0:
-                            self.pi.penUp(1)
+                            self.pi.penDown(1)
                             error = error - 1.0
                         else:
-                            self.pi.penDown(1)
+                            self.pi.penUp(1)
                             error = error - 1.0
 
             else:
@@ -143,10 +134,10 @@ class SVG:
                     error = error + deltaErr
                     while error >= 0.5:
                         if slope >= 0:
-                            self.pi.penUp(1)
+                            self.pi.penDown(1)
                             error = error - 1.0
                         else:
-                            self.pi.penDown(1)
+                            self.pi.penUp(1)
                             error = error - 1.0
 
             else:
@@ -213,6 +204,7 @@ class SVG:
 
         return 0
     def relativeQuadratic(self,x1,y1,x,y):
+        #Taken care of with absolute quadratic
         return 0
     def absoluteTQuadratic(self,x,y):
         return 0
@@ -231,6 +223,7 @@ class SVG:
         return 0
 
     def relativeCubic(self,dx1,dy1,dx2,dy2,dx,dy):
+        #Taken care of with Absolute Cubic
         return 0
     def absoluteSCubic(self,x1,y1,x,y):
         return 0
@@ -249,16 +242,28 @@ class SVG:
 
     def parsePath(self):
         startX, startY = 0,0
+        lastQControlPoint = (0,0)
 
         while self.currInstr < len(self.path):
-            print self.currInstr
             if self.peek() == 'M':
                 origX = self.pi.getCurrX()
                 origY = self.pi.getCurrY()
-                x = int(self.nextAndGet())
-                y = int(self.nextAndGet())
+                x =util.parseNumberString(self.nextAndGet())
+                y =util.parseNumberString(self.nextAndGet())
                 print "Moving from (%d, %d) to (%d, %d)" % (origX, origY, x, y)
                 self.absoluteMoveTo(x,y)
+                startX = self.pi.getCurrX()
+                startY = self.pi.getCurrY()
+
+                self.printCurrLocation()
+                self.nextInstr()
+            elif self.peek() == 'm':
+                origX = self.pi.getCurrX()
+                origY = self.pi.getCurrY()
+                x =util.parseNumberString(self.nextAndGet())
+                y =util.parseNumberString(self.nextAndGet())
+                print "Moving from (%d, %d) to (%d, %d)" % (origX, origY, origX+x, origY+y)
+                self.absoluteMoveTo(origX+x,origY+y)
                 startX = self.pi.getCurrX()
                 startY = self.pi.getCurrY()
 
@@ -268,8 +273,8 @@ class SVG:
             elif self.peek() == 'L':
                 origX = self.pi.getCurrX()
                 origY = self.pi.getCurrY()
-                x = int(self.nextAndGet())
-                y = int(self.nextAndGet())
+                x =util.parseNumberString(self.nextAndGet())
+                y =util.parseNumberString(self.nextAndGet())
 
                 print "Drawing line from (%d, %d) to (%d, %d)" % (origX, origY, x, y)
 
@@ -279,28 +284,30 @@ class SVG:
             elif self.peek() == 'l':
                 origX = self.pi.getCurrX()
                 origY = self.pi.getCurrY()
-                x = int(self.nextAndGet())
-                y = int(self.nextAndGet())
+                x =util.parseNumberString(self.nextAndGet())
+                y =util.parseNumberString(self.nextAndGet())
 
                 print "Drawing relative line from (%d, %d) with dimensions (%d, %d)" % (origX, origY, x, y)
 
-                self.relativeLineTo(x,y)
+                self.absoluteLineTo(origX+x,origY+y)
                 self.printCurrLocation()
                 self.nextInstr()
+
             elif self.peek() == 'H':
                 origX = self.pi.getCurrX()
                 origY = self.pi.getCurrY()
-                x = int(self.nextAndGet())
+                x = util.parseNumberString(self.nextAndGet())
                 print "Drawing horizontal line from (%d, %d) to (%d, %d)" % (origX, origY, x, origY)
 
                 self.absoluteHorizonTal(x)
 
                 self.printCurrLocation()
                 self.nextInstr()
+
             elif self.peek() == 'h':
                 origX = self.pi.getCurrX()
                 origY = self.pi.getCurrY()
-                x = int(self.nextAndGet())
+                x =util.parseNumberString(self.nextAndGet())
                 print "Drawing relative horizontal line from (%d, %d) width length %d" % (origX, origY, x)
 
                 self.relativeHorizontal(x)
@@ -311,7 +318,7 @@ class SVG:
             elif self.peek() == 'V':
                 origX = self.pi.getCurrX()
                 origY = self.pi.getCurrY()
-                y = int(self.nextAndGet())
+                y =util.parseNumberString(self.nextAndGet())
                 print "Drawing vertical line from (%d, %d) to (%d, %d)" % (origX, origY, origX, y)
 
                 self.absoluteVertical(y)
@@ -321,7 +328,7 @@ class SVG:
             elif self.peek() == 'v':
                 origX = self.pi.getCurrX()
                 origY = self.pi.getCurrY()
-                y = int(self.nextAndGet())
+                y =util.parseNumberString(self.nextAndGet())
                 print "Drawing relative vertical line from (%d, %d) height length %d" % (origX, origY, y)
 
                 self.relativeVertical(y)
@@ -332,14 +339,32 @@ class SVG:
             elif self.peek() == 'Q':
                 origX = self.pi.getCurrX()
                 origY = self.pi.getCurrY()
-                ctrlx = int(self.nextAndGet())
-                ctrly = int(self.nextAndGet())
-                endX = int(self.nextAndGet())
-                endY = int(self.nextAndGet())
+                ctrlx =util.parseNumberString(self.nextAndGet())
+                ctrly =util.parseNumberString(self.nextAndGet())
+                endX =util.parseNumberString(self.nextAndGet())
+                endY =util.parseNumberString(self.nextAndGet())
 
                 print "Drawing Quadratic Curve from (%d, %d) to (%d, %d) with control point (%d, %d)" % (origX, origY, endX, endY, ctrlx, ctrly)
 
                 self.absoluteQuadratic(ctrlx,ctrly,endX,endY)
+
+                lastQControlPoint = (ctrlx, ctrly)
+
+                self.printCurrLocation()
+                self.nextInstr()
+            elif self.peek() == 'q':
+                origX = self.pi.getCurrX()
+                origY = self.pi.getCurrY()
+                ctrlxChange =util.parseNumberString(self.nextAndGet())
+                ctrlyChange =util.parseNumberString(self.nextAndGet())
+                endXChange =util.parseNumberString(self.nextAndGet())
+                endYChange =util.parseNumberString(self.nextAndGet())
+
+                print "Drawing Relative Quadratic Curve from (%d, %d) to (%d, %d) with control point (%d, %d)" % (origX, origY, origX+endXChange, origY+endYChange, origX+ctrlxChange, origY+ctrlyChange)
+
+                self.absoluteQuadratic(origX+ctrlxChange, origY+ctrlyChange,origX+endXChange, origY+endYChange)
+
+                lastQControlPoint = (origX+ctrlxChange, origY+ctrlyChange)
 
                 self.printCurrLocation()
                 self.nextInstr()
@@ -347,16 +372,152 @@ class SVG:
             elif self.peek() == 'C':
                 origX = self.pi.getCurrX()
                 origY = self.pi.getCurrY()
-                ctrlx1 = int(self.nextAndGet())
-                ctrly1 = int(self.nextAndGet())
-                ctrlx2 = int(self.nextAndGet())
-                ctrly2 = int(self.nextAndGet())
-                endX = int(self.nextAndGet())
-                endY = int(self.nextAndGet())
+                ctrlx1 =util.parseNumberString(self.nextAndGet())
+                ctrly1 =util.parseNumberString(self.nextAndGet())
+                ctrlx2 =util.parseNumberString(self.nextAndGet())
+                ctrly2 =util.parseNumberString(self.nextAndGet())
+                endX =util.parseNumberString(self.nextAndGet())
+                endY =util.parseNumberString(self.nextAndGet())
 
                 print "Drawing Cubic Curve from (%d, %d) to (%d, %d) with control points (%d, %d) and (%d, %d)" % (origX, origY, endX, endY, ctrlx1, ctrly1, ctrlx2, ctrly2)
 
                 self.absoluteCubic(ctrlx1, ctrly1, ctrlx2, ctrly2, endX, endY)
+
+                self.printCurrLocation()
+                self.nextInstr()
+
+            elif self.peek() == 'c':
+                origX = self.pi.getCurrX()
+                origY = self.pi.getCurrY()
+                ctrlx1 =util.parseNumberString(self.nextAndGet())
+                ctrly1 =util.parseNumberString(self.nextAndGet())
+                ctrlx2 =util.parseNumberString(self.nextAndGet())
+                ctrly2 =util.parseNumberString(self.nextAndGet())
+                endX =util.parseNumberString(self.nextAndGet())
+                endY =util.parseNumberString(self.nextAndGet())
+
+                print "Drawing Relative Cubic Curve from (%d, %d) to (%d, %d) with control points (%d, %d) and (%d, %d)" % (origX, origY, origX+endX, origY+endY, origX+ctrlx1, origY+ctrly1, origX+ctrlx2, origY+ctrly2)
+
+                self.absoluteCubic(origX+ctrlx1, origY+ctrly1, origX+ctrlx2, origY+ctrly2, origX+endX, origY+endY)
+
+                self.printCurrLocation()
+                self.nextInstr()
+            elif self.peek() == 'S':
+                origX = self.pi.getCurrX()
+                origY = self.pi.getCurrY()
+
+                tempIndex = self.currInstr
+
+                ctrl2x = (util.parseNumberString(self.nextAndGet()))
+                ctrl2y = (util.parseNumberString(self.nextAndGet()))
+
+                endX = (util.parseNumberString(self.nextAndGet()))
+                endY = (util.parseNumberString(self.nextAndGet()))
+
+                if tempIndex-7 >= 0 and (self.path[tempIndex-7] in ['C','c'] or self.path[tempIndex-5] in ['s','S']):
+                    lastControlX = self.path[tempIndex - 4]
+                    lastControlY = self.path[tempIndex - 3]
+
+                    trueControlX = (origX * 2) - util.parseNumberString(lastControlX)
+                    trueControlY = (origY * 2) - util.parseNumberString(lastControlY)
+
+                    print "Drawing Absolute S Curve from (%d, %d) to (%d, %d) with control points (%d, %d) and (%d, %d)" % (origX, origY, endX, endY, trueControlX, trueControlY, ctrl2x, ctrly2)
+
+                    self.absoluteCubic(trueControlX, trueControlY, ctrl2x, ctrl2y, endX, endY)
+                else:
+                    print "Drawing Absolute S Curve w/ Quadratic from (%d, %d) to (%d, %d) with control point(%d, %d)" % (origX, origY, endX, endY, ctrl2x, ctrly2)
+
+                    self.absoluteQuadratic(ctrl2x, ctrl2y, endX, endY)
+
+                self.printCurrLocation()
+                self.nextInstr()
+            elif self.peek() == 's':
+                origX = self.pi.getCurrX()
+                origY = self.pi.getCurrY()
+
+                tempIndex = self.currInstr
+
+                ctrl2x = (util.parseNumberString(self.nextAndGet()))
+                ctrl2y = (util.parseNumberString(self.nextAndGet()))
+
+                endX = (util.parseNumberString(self.nextAndGet()))
+                endY = (util.parseNumberString(self.nextAndGet()))
+
+                if tempIndex - 7 >= 0 and (self.path[tempIndex-7] in ['C','c'] or self.path[tempIndex-5] in ['s','S']):
+                    lastControlX = self.path[tempIndex - 4]
+                    lastControlY = self.path[tempIndex - 3]
+
+                    trueControlX = (origX * 2) - util.parseNumberString(lastControlX)
+                    trueControlY = (origY * 2) - util.parseNumberString(lastControlY)
+
+                    print "Drawing Relative S Curve from (%d, %d) to (%d, %d) with control points (%d, %d) and (%d, %d)" % (
+                    origX, origY, origX+endX, origY+endY, trueControlX, trueControlY, origX+ctrl2x, origY+ctrly2)
+
+                    self.absoluteCubic(trueControlX, trueControlY, origX+ctrl2x, origY+ctrl2y, origX+endX, origY+endY)
+                else:
+                    print "Drawing Relative S Curve w/ Quadratic from (%d, %d) to (%d, %d) with control point(%d, %d)" % (
+                    origX, origY, origX+endX, origY+endY, origX+ctrl2x, origY+ctrly2)
+
+                    self.absoluteQuadratic(origX+ctrl2x, origY+ctrl2y, origX+endX, origY+endY)
+
+                self.printCurrLocation()
+                self.nextInstr()
+            elif self.peek() == 'T':
+                origX = self.pi.getCurrX()
+                origY = self.pi.getCurrY()
+
+                tempIndex = self.currInstr
+
+                endX = util.parseNumberString(self.nextAndGet())
+                endY = util.parseNumberString(self.nextAndGet())
+
+                if tempIndex - 5 >= 0 and (self.path[tempIndex-5] in ['Q', 'q'] or self.path[tempIndex-3] in ['t', 'T']):
+                    ctrlX = (origX * 2) - lastQControlPoint[0]
+                    ctrlY = (origY * 2) - lastQControlPoint[1]
+
+                    print "Drawing Absolute T Curve from (%d, %d) to (%d, %d) with control point (%d, %d)" % (origX, origY, endX, endY, ctrlX, ctrlY)
+
+                    self.absoluteQuadratic(ctrlX, ctrlY, endX, endY)
+
+                    lastQControlPoint = (ctrlX, ctrlY)
+                else:
+                    print "Drawing Absolute T Curve from (%d, %d) to (%d, %d) with line" % (
+                    origX, origY, endX, endY)
+
+                    self.absoluteMoveTo(endX, endY)
+
+                    lastQControlPoint = (origX, origY)
+
+                self.printCurrLocation()
+                self.nextInstr()
+
+            elif self.peek() == 't':
+                origX = self.pi.getCurrX()
+                origY = self.pi.getCurrY()
+
+                tempIndex = self.currInstr
+
+                endX = util.parseNumberString(self.nextAndGet())
+                endY = util.parseNumberString(self.nextAndGet())
+
+                if tempIndex - 5 >= 0 and (
+                        self.path[tempIndex - 5] in ['Q', 'q'] or self.path[tempIndex - 3] in ['t', 'T']):
+                    ctrlX = (origX * 2) - lastQControlPoint[0]
+                    ctrlY = (origY * 2) - lastQControlPoint[1]
+
+                    print "Drawing Relative t Curve from (%d, %d) to (%d, %d) with control point (%d, %d)" % (
+                    origX, origY, endX, endY, ctrlX, ctrlY)
+
+                    self.absoluteQuadratic(ctrlX, ctrlY, origX+endX, origY+endY)
+
+                    lastQControlPoint = (ctrlX, ctrlY)
+                else:
+                    print "Drawing Relative T Curve from (%d, %d) to (%d, %d) with line" % (
+                        origX, origY, endX, endY)
+
+                    self.absoluteMoveTo(origX+endX, origY+endY)
+
+                    lastQControlPoint = (origX, origY)
 
                 self.printCurrLocation()
                 self.nextInstr()
@@ -375,16 +536,16 @@ class SVG:
 
 
 if __name__=="__main__":
-    htmlCode = '''<svg width="4cm" height="4cm" viewBox="0 0 400 400"xmlns="http://www.w3.org/2000/svg" version="1.1"> <title>Example triangle01- simple example of a 'path'</title> <desc>A path that draws a triangle</desc> <rect x="1" y="1" width="398" height="398"fill="none" stroke="blue" /> <path d="M 100 200 C 100 100 400 100 400 200 z"fill="red" stroke="blue" stroke-width="3" /> </svg>'''
-    svgAnalysis = SVG(htmlCode)
+    svgAnalysis = SVG("lincoln.svg")
     svgAnalysis.getSVGPath()
     xyPoints = svgAnalysis.parsePath()
-    print xyPoints
     xVals = []
     yVals = []
     for point in xyPoints:
         xVals.append(point[0])
         yVals.append(point[1])
     plt.plot(xVals, yVals)
+    ax = plt.gca()
+    ax.set_ylim(ax.get_ylim()[::-1])
     plt.ylabel('some numbers')
     plt.show()
